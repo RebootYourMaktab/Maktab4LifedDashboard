@@ -805,7 +805,9 @@ async function loadProgressTasks() {
     return;
   }
 
-  container.innerHTML = result.tasks.map(task => `
+  const sortedTasks = [...result.tasks].sort(sortByTaskIdAsc);
+
+  container.innerHTML = sortedTasks.map(task => `
     <button class="progress-list-button" onclick="openProgressTask('${task.taskid}', '${escapeForAttribute(task.taskname)}')">
       <span class="progress-list-title">${escapeHtml(task.taskname)}</span>
       ${renderProgressBars(task.completedPercent, task.verifiedPercent)}
@@ -969,7 +971,7 @@ function renderIndividualStudentTaskList(rows) {
     .forEach(subjectName => {
       html += `<div class="group-heading">${escapeHtml(subjectName)}</div>`;
 
-      bySubject[subjectName].forEach(row => {
+      bySubject[subjectName].sort(sortByTaskIdAsc).forEach(row => {
         const pending = progressPendingUpdates[row.studenttaskid] || {};
 
         const completeStatus = pending.completeStatus !== undefined
@@ -1081,6 +1083,21 @@ async function saveProgressPendingChanges() {
    HELPERS
 ========================= */
 
+
+function getTaskIdValue(task) {
+  return task.taskid ?? task.taskID ?? task.TaskID ?? task.taskId ?? "";
+}
+
+function sortByTaskIdAsc(a, b) {
+  const aId = String(getTaskIdValue(a)).trim();
+  const bId = String(getTaskIdValue(b)).trim();
+
+  return aId.localeCompare(bId, undefined, {
+    numeric: true,
+    sensitivity: "base"
+  });
+}
+
 function groupTasksBySubject(tasks) {
   const grouped = {};
 
@@ -1095,9 +1112,7 @@ function groupTasksBySubject(tasks) {
   });
 
   Object.keys(grouped).forEach(subjectName => {
-    grouped[subjectName].sort((a, b) => {
-      return String(a.taskname).localeCompare(String(b.taskname));
-    });
+    grouped[subjectName].sort(sortByTaskIdAsc);
   });
 
   return grouped;
