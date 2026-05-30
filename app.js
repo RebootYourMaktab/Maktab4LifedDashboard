@@ -311,77 +311,213 @@ async function loadProgressReport() {
   `;
 }
 
+
+let allSubjects = [];
+let pendingSubjects = [];
+let selectedSubject = null;
+
 async function showSubjectsScreen() {
   showScreen("subjects-screen");
-  await loadSubjects();
+
+  pendingSubjects = [];
+  selectedSubject = null;
+
+  document.getElementById("subject-add-message").innerText = "";
+  document.getElementById("modify-subject-box").classList.add("hidden");
+
+  renderSubjectAddRows();
+  await loadSubjectsForModify();
 }
 
-async function loadSubjects() {
-  const container = document.getElementById("subjects-list");
+function renderSubjectAddRows() {
+  const container = document.getElementById("subject-add-list");
+  const submitBtn = document.getElementById("submit-subjects-btn");
 
-  container.innerHTML = `<p class="helper-text">Loading subjects...</p>`;
+  let html = "";
 
-  const result = await apiPost("/api/admin/subjects/list", {}, state.token);
+  pendingSubjects.forEach((name, index) => {
+    html += `
+      <div class="pending-subject-chip">
+        <span>${escapeHtml(name)}</span>
+        <button onclick="removePendingSubject(${index})">Remove</button>
+      </div>
+    `;
+  });
 
-  if (!result.success) {
-    container.innerHTML = `<p class="error-message">${result.error || "Failed to load subjects"}</p>`;
-    return;
+  if (pendingSubjects.length < 5) {
+    html += `
+      <div class="subject-add-row">
+        <input
+          id="new-subject-input"
+          type="text"
+          placeholder="add a new subject"
+          onkeydown="handleSubjectInputKey(event)"
+        />
+        <button class="enter-btn" onclick="addPendingSubject()">↵</button>
+      </div>
+    `;
   }
 
-  if (result.subjects.length === 0) {
-    container.innerHTML = `<p class="helper-text">No subjects created yet.</p>`;
-    return;
+  container.innerHTML = html;
+
+  if (pendingSubjects.length > 0) {
+    submitBtn.classList.remove("hidden");
+  } else {
+    submitBtn.classList.add("hidden");
   }
-
-  container.innerHTML = result.subjects.map(subject => `
-    <div class="task-card admin-task-card">
-      <div class="task-title">${escapeHtml(subject.subjectname)}</div>
-      <div class="task-meta">ID: ${escapeHtml(subject.subjectid)}</div>
-      <div class="status-pill">${subject.active === true ? "ACTIVE" : "INACTIVE"}</div>
-
-      <input
-        id="subject-name-${subject.subjectid}"
-        type="text"
-        value="${escapeHtml(subject.subjectname)}"
-        placeholder="Subject name"
-      />
-
-      <button onclick="updateSubjectName('${subject.subjectid}')">
-        Save Name
-      </button>
-
-      <button onclick="toggleSubjectActive('${subject.subjectid}', ${subject.active === true ? "false" : "true"})">
-        ${subject.active === true ? "Deactivate" : "Activate"}
-      </button>
-    </div>
-  `).join("");
 }
 
-async function createSubjectFromUI() {
-  const input = document.getElementById("new-subject-name");
-  const subjectName = input.value.trim();
+function handleSubjectInputKey(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    addPendingSubject();
+  }
+}
+
+function addPendingSubject() {
+  const input = document.getElementById("new-subject-input");
+  const subjectName = input ? input.value.trim() : "";
 
   if (!subjectName) {
     alert("Enter a subject name.");
     return;
   }
 
-  const result = await apiPost("/api/admin/subjects/create", {
-    subjectName
-  }, state.token);
-
-  if (!result.success) {
-    alert(result.error || "Could not create subject.");
+  if (pendingSubjects.length >= 5) {
+    alert("You can add up to 5 subjects at once.");
     return;
   }
 
-  input.value = "";
-  await loadSubjects();
+  const normalizedNew = normalizeClientText(subjectName);
+
+  const duplicatePending = pendingSubjects.some(
+    name => normalizeClientText(name) === normalizedNew
+  );
+
+  if (duplicatePending) {
+    alert("This subject is already in your pending list.");
+    return;
+  }
+
+  const duplicateExisting = allSubjects.some(
+    subject => normalizeClientText(subject.subjectname) === normalizedNew
+  );
+
+  if (duplicateExisting) {
+    alert("This subject already exists.");
+    return;
+  }
+
+  pendingSubjects.push(subjectName);
+  renderSubjectAddRows();
+
+  setTimeout(() => {
+    const nextInput = document.getElementById("new-subject-input");
+    if (nextInput) nextInput.focus();
+  }, 50);
 }
 
-async function updateSubjectName(subjectid) {
-  const input = document.getElementById(`subject-name-${subjectid}`);
-  const subjectName = input.value.trim();
+function removePendingSubject(index) {
+  pendingSubjects.splice(index, 1);
+  renderSubjectAddRows();
+}
+
+async function submitPendingSubjects() {
+  if (pendingSubjects.length === 0) {
+    return;
+  }
+
+  const added = [];
+  const failed = [];
+
+  for (const subjectName of pendingSubjects) {
+    const result = await apiPost("/api/admin/subjects/create", {
+      subjectName
+    }, state.token);
+
+    if (result.success) {
+      added.push(result.subject.subjectname);
+    } else {
+      failed.push({
+        subjectName,
+        error: result.error || "Failed"
+      });
+    }
+  }
+
+  if (added.length > 0) {
+    document.getElementById("subject-add-message").innerText =
+      `${added.join(", ")} ${added.length === 1 ? "has" : "have"} been added.`;
+  }
+
+  if (failed.length > 0) {
+    alert(
+      "Some subjects were not added:\n" +
+      failed.map(f => `${f.subjectName}: ${f.error}`).join("\n")
+    );
+  }
+
+  pendingSubjects = [];
+  renderSubjectAddRows();
+  await loadSubjectsForModify();
+}
+
+async function loadSubjectsForModify() {
+  const select = document.getElementById("modify-subject-select");
+
+  select.innerHTML = `<option value="">Loading subjects...</option>`;
+
+  const result = await apiPost("/api/admin/subjects/list", {}, state.token);
+
+  if (!result.success) {
+    select.innerHTML = `<option value="">Failed to load subjects</option>`;
+    return;
+  }
+
+  allSubjects = result.subjects || [];
+
+  select.innerHTML = `<option value="">Select subject...</option>`;
+
+  allSubjects.forEach(subject => {
+    const status = subject.active === true ? "ACTIVE" : "INACTIVE";
+
+    const option = document.createElement("option");
+    option.value = subject.subjectid;
+    option.textContent = `${subject.subjectname} — ${status}`;
+
+    select.appendChild(option);
+  });
+}
+
+function selectSubjectToModify() {
+  const subjectid = document.getElementById("modify-subject-select").value;
+
+  selectedSubject = allSubjects.find(subject => subject.subjectid === subjectid);
+
+  const box = document.getElementById("modify-subject-box");
+
+  if (!selectedSubject) {
+    box.classList.add("hidden");
+    return;
+  }
+
+  document.getElementById("modify-subject-name").value = selectedSubject.subjectname;
+
+  const statusBtn = document.getElementById("toggle-subject-status-btn");
+  statusBtn.innerText = selectedSubject.active === true
+    ? "Mark Inactive"
+    : "Mark Active";
+
+  box.classList.remove("hidden");
+}
+
+async function saveModifiedSubject() {
+  if (!selectedSubject) {
+    alert("Select a subject first.");
+    return;
+  }
+
+  const subjectName = document.getElementById("modify-subject-name").value.trim();
 
   if (!subjectName) {
     alert("Subject name cannot be empty.");
@@ -389,7 +525,7 @@ async function updateSubjectName(subjectid) {
   }
 
   const result = await apiPost("/api/admin/subjects/update", {
-    subjectid,
+    subjectid: selectedSubject.subjectid,
     subjectName
   }, state.token);
 
@@ -398,22 +534,55 @@ async function updateSubjectName(subjectid) {
     return;
   }
 
-  await loadSubjects();
+  alert("Subject updated.");
+  await loadSubjectsForModify();
+
+  document.getElementById("modify-subject-box").classList.add("hidden");
+  selectedSubject = null;
 }
 
-async function toggleSubjectActive(subjectid, active) {
-  const result = await apiPost("/api/admin/subjects/update", {
-    subjectid,
-    active
-  }, state.token);
-
-  if (!result.success) {
-    alert(result.error || "Could not update subject.");
+async function toggleSelectedSubjectStatus() {
+  if (!selectedSubject) {
+    alert("Select a subject first.");
     return;
   }
 
-  await loadSubjects();
+  const newStatus = selectedSubject.active !== true;
+
+  const result = await apiPost("/api/admin/subjects/update", {
+    subjectid: selectedSubject.subjectid,
+    active: newStatus
+  }, state.token);
+
+  if (!result.success) {
+    alert(result.error || "Could not update subject status.");
+    return;
+  }
+
+  alert(newStatus ? "Subject marked active." : "Subject marked inactive.");
+
+  await loadSubjectsForModify();
+
+  document.getElementById("modify-subject-box").classList.add("hidden");
+  selectedSubject = null;
 }
+
+function normalizeClientText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+
+
+
+
+
+
+
 
 
 
