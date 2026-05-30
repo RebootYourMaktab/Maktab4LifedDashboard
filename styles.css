@@ -44,7 +44,7 @@ body {
   background: var(--panel);
   border-radius: 18px;
   box-shadow: 0 8px 18px var(--shadow);
-  padding: 20px;
+  padding: 18px;
   text-align: center;
 }
 
@@ -80,9 +80,11 @@ h3 {
   color: var(--student-dark);
 }
 
+
+
 .app-logo {
   width: 38vw;
-  max-width: 150px;
+  max-width: 120px;
   aspect-ratio: 1 / 1;
   object-fit: cover;
   border-radius: 50%;
@@ -223,6 +225,8 @@ button:active {
   padding: 14px;
   text-align: left;
   border-left: 6px solid var(--student-dark);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+  margin-bottom: 10px;
 }
 
 .admin-task-card {
