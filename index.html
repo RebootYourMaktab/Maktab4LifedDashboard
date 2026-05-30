@@ -123,7 +123,7 @@
       </div>
 
       <div class="list-stack">
-        <button class="list-btn" onclick="showPlaceholder('Subjects')">Subjects</button>
+        <button class="list-btn" onclick="showSubjectsScreen()">Subjects</button>        
         <button class="list-btn" onclick="showPlaceholder('Resources')">Resources</button>
         <button class="list-btn" onclick="showPlaceholder('Tasks')">Tasks</button>
         <button class="list-btn" onclick="showPlaceholder('Assign Tasks')">Assign Tasks</button>
@@ -159,6 +159,25 @@
       <div id="progress-output" class="list-stack"></div>
     </section>
 
+    
+    <section id="subjects-screen" class="screen admin-theme">
+  <div class="nav-header">
+    <h2>Subjects</h2>
+    <button class="small-btn" onclick="showScreen('admin-academics')">Back</button>
+  </div>
+
+  <div id="subject-form" class="dashboard-section">
+    <h3>Add Subject</h3>
+    <input id="new-subject-name" type="text" placeholder="Subject name" />
+    <button onclick="createSubjectFromUI()">Add Subject</button>
+  </div>
+
+  <div id="subjects-list" class="list-stack">
+    <p class="helper-text">Loading subjects...</p>
+  </div>
+</section>
+
+    
     <!-- PLACEHOLDER SCREEN -->
     <section id="placeholder-screen" class="screen">
       <div class="nav-header">
