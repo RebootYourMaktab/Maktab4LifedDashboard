@@ -511,11 +511,7 @@ function selectSubjectToModify() {
   box.classList.remove("hidden");
 }
 
-async function saveModifiedSubject() {
-  if (!selectedSubject) {
-    alert("Select a subject first.");
-    return;
-  }
+
 
   const subjectName = document.getElementById("modify-subject-name").value.trim();
 
@@ -541,11 +537,95 @@ async function saveModifiedSubject() {
   selectedSubject = null;
 }
 
-async function toggleSelectedSubjectStatus() {
+
+let selectedSubjectDraftActive = null;
+
+function selectSubjectToModify() {
+  const subjectid = document.getElementById("modify-subject-select").value;
+
+  selectedSubject = allSubjects.find(subject => subject.subjectid === subjectid);
+
+  const box = document.getElementById("modify-subject-box");
+
+  if (!selectedSubject) {
+    box.classList.add("hidden");
+    selectedSubjectDraftActive = null;
+    return;
+  }
+
+  selectedSubjectDraftActive = selectedSubject.active === true;
+
+  document.getElementById("modify-subject-name").value = selectedSubject.subjectname;
+
+  renderSelectedSubjectStatus();
+
+  box.classList.remove("hidden");
+}
+
+function renderSelectedSubjectStatus() {
+  const statusDisplay = document.getElementById("selected-subject-status");
+  const statusBtn = document.getElementById("toggle-subject-status-btn");
+
+  if (!selectedSubject) {
+    statusDisplay.innerText = "STATUS: -";
+    statusBtn.innerText = "Change Status";
+    return;
+  }
+
+  statusDisplay.innerText = selectedSubjectDraftActive
+    ? "STATUS: ACTIVE"
+    : "STATUS: INACTIVE";
+
+  statusBtn.innerText = selectedSubjectDraftActive
+    ? "Make Inactive"
+    : "Make Active";
+}
+
+function toggleSubjectStatusLocal() {
   if (!selectedSubject) {
     alert("Select a subject first.");
     return;
   }
+
+  selectedSubjectDraftActive = !selectedSubjectDraftActive;
+  renderSelectedSubjectStatus();
+}
+
+async function saveSubjectChanges() {
+  if (!selectedSubject) {
+    alert("Select a subject first.");
+    return;
+  }
+
+  const subjectName = document.getElementById("modify-subject-name").value.trim();
+
+  if (!subjectName) {
+    alert("Subject name cannot be empty.");
+    return;
+  }
+
+  const result = await apiPost("/api/admin/subjects/update", {
+    subjectid: selectedSubject.subjectid,
+    subjectName,
+    active: selectedSubjectDraftActive
+  }, state.token);
+
+  if (!result.success) {
+    alert(result.error || "Could not update subject.");
+    return;
+  }
+
+  alert("Subject changes saved.");
+
+  await loadSubjectsForModify();
+
+  document.getElementById("modify-subject-box").classList.add("hidden");
+  selectedSubject = null;
+  selectedSubjectDraftActive = null;
+}
+
+
+
 
   const newStatus = selectedSubject.active !== true;
 
