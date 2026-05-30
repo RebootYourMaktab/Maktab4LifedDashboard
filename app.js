@@ -315,12 +315,14 @@ async function loadProgressReport() {
 let allSubjects = [];
 let pendingSubjects = [];
 let selectedSubject = null;
+let selectedSubjectDraftActive = null;
 
 async function showSubjectsScreen() {
   showScreen("subjects-screen");
 
   pendingSubjects = [];
   selectedSubject = null;
+  selectedSubjectDraftActive = null;
 
   document.getElementById("subject-add-message").innerText = "";
   document.getElementById("modify-subject-box").classList.add("hidden");
@@ -498,57 +500,6 @@ function selectSubjectToModify() {
 
   if (!selectedSubject) {
     box.classList.add("hidden");
-    return;
-  }
-
-  document.getElementById("modify-subject-name").value = selectedSubject.subjectname;
-
-  const statusBtn = document.getElementById("toggle-subject-status-btn");
-  statusBtn.innerText = selectedSubject.active === true
-    ? "Mark Inactive"
-    : "Mark Active";
-
-  box.classList.remove("hidden");
-}
-
-
-
-  const subjectName = document.getElementById("modify-subject-name").value.trim();
-
-  if (!subjectName) {
-    alert("Subject name cannot be empty.");
-    return;
-  }
-
-  const result = await apiPost("/api/admin/subjects/update", {
-    subjectid: selectedSubject.subjectid,
-    subjectName
-  }, state.token);
-
-  if (!result.success) {
-    alert(result.error || "Could not update subject.");
-    return;
-  }
-
-  alert("Subject updated.");
-  await loadSubjectsForModify();
-
-  document.getElementById("modify-subject-box").classList.add("hidden");
-  selectedSubject = null;
-
-
-
-let selectedSubjectDraftActive = null;
-
-function selectSubjectToModify() {
-  const subjectid = document.getElementById("modify-subject-select").value;
-
-  selectedSubject = allSubjects.find(subject => subject.subjectid === subjectid);
-
-  const box = document.getElementById("modify-subject-box");
-
-  if (!selectedSubject) {
-    box.classList.add("hidden");
     selectedSubjectDraftActive = null;
     return;
   }
@@ -624,29 +575,6 @@ async function saveSubjectChanges() {
   selectedSubjectDraftActive = null;
 }
 
-
-
-
-  const newStatus = selectedSubject.active !== true;
-
-  const result = await apiPost("/api/admin/subjects/update", {
-    subjectid: selectedSubject.subjectid,
-    active: newStatus
-  }, state.token);
-
-  if (!result.success) {
-    alert(result.error || "Could not update subject status.");
-    return;
-  }
-
-  alert(newStatus ? "Subject marked active." : "Subject marked inactive.");
-
-  await loadSubjectsForModify();
-
-  document.getElementById("modify-subject-box").classList.add("hidden");
-  selectedSubject = null;
-}
-
 function normalizeClientText(value) {
   return String(value || "")
     .trim()
@@ -655,8 +583,6 @@ function normalizeClientText(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "");
 }
-
-
 
 
 
