@@ -535,7 +535,7 @@ function selectSubjectToModify() {
 
   document.getElementById("modify-subject-box").classList.add("hidden");
   selectedSubject = null;
-}
+
 
 
 let selectedSubjectDraftActive = null;
