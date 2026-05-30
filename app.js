@@ -842,7 +842,7 @@ async function openProgressContext(type, value) {
   if (type === "group") {
     progressState.classgroup = value;
     progressState.studentid = "ALL";
-    document.getElementById("progress-subjects-title").innerText = `${value} Subjects`;
+    document.getElementById("progress-subjects-title").innerText = `Group ${value} Subjects`;
     await loadProgressSubjects();
     return;
   }
