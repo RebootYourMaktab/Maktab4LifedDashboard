@@ -311,6 +311,112 @@ async function loadProgressReport() {
   `;
 }
 
+async function showSubjectsScreen() {
+  showScreen("subjects-screen");
+  await loadSubjects();
+}
+
+async function loadSubjects() {
+  const container = document.getElementById("subjects-list");
+
+  container.innerHTML = `<p class="helper-text">Loading subjects...</p>`;
+
+  const result = await apiPost("/api/admin/subjects/list", {}, state.token);
+
+  if (!result.success) {
+    container.innerHTML = `<p class="error-message">${result.error || "Failed to load subjects"}</p>`;
+    return;
+  }
+
+  if (result.subjects.length === 0) {
+    container.innerHTML = `<p class="helper-text">No subjects created yet.</p>`;
+    return;
+  }
+
+  container.innerHTML = result.subjects.map(subject => `
+    <div class="task-card admin-task-card">
+      <div class="task-title">${escapeHtml(subject.subjectname)}</div>
+      <div class="task-meta">ID: ${escapeHtml(subject.subjectid)}</div>
+      <div class="status-pill">${subject.active === true ? "ACTIVE" : "INACTIVE"}</div>
+
+      <input
+        id="subject-name-${subject.subjectid}"
+        type="text"
+        value="${escapeHtml(subject.subjectname)}"
+        placeholder="Subject name"
+      />
+
+      <button onclick="updateSubjectName('${subject.subjectid}')">
+        Save Name
+      </button>
+
+      <button onclick="toggleSubjectActive('${subject.subjectid}', ${subject.active === true ? "false" : "true"})">
+        ${subject.active === true ? "Deactivate" : "Activate"}
+      </button>
+    </div>
+  `).join("");
+}
+
+async function createSubjectFromUI() {
+  const input = document.getElementById("new-subject-name");
+  const subjectName = input.value.trim();
+
+  if (!subjectName) {
+    alert("Enter a subject name.");
+    return;
+  }
+
+  const result = await apiPost("/api/admin/subjects/create", {
+    subjectName
+  }, state.token);
+
+  if (!result.success) {
+    alert(result.error || "Could not create subject.");
+    return;
+  }
+
+  input.value = "";
+  await loadSubjects();
+}
+
+async function updateSubjectName(subjectid) {
+  const input = document.getElementById(`subject-name-${subjectid}`);
+  const subjectName = input.value.trim();
+
+  if (!subjectName) {
+    alert("Subject name cannot be empty.");
+    return;
+  }
+
+  const result = await apiPost("/api/admin/subjects/update", {
+    subjectid,
+    subjectName
+  }, state.token);
+
+  if (!result.success) {
+    alert(result.error || "Could not update subject.");
+    return;
+  }
+
+  await loadSubjects();
+}
+
+async function toggleSubjectActive(subjectid, active) {
+  const result = await apiPost("/api/admin/subjects/update", {
+    subjectid,
+    active
+  }, state.token);
+
+  if (!result.success) {
+    alert(result.error || "Could not update subject.");
+    return;
+  }
+
+  await loadSubjects();
+}
+
+
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
