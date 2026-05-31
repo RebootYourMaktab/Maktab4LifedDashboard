@@ -272,6 +272,8 @@ function setProgressScreensForStudent() {
   const taskBackButton = document.querySelector("#progress-tasks-screen .small-btn");
   if (taskBackButton) {
     taskBackButton.setAttribute("onclick", "showStudentTasks()");
+    taskBackButton.innerText = "←";
+    taskBackButton.title = "Back to subjects";
   }
 }
 
@@ -359,6 +361,13 @@ function openStudentSubjectTasks(subjectKey) {
   }
 
   currentStudentSubjectKey = subjectKey;
+  progressPendingUpdates = {};
+  progressState.contextType = "student-self";
+  progressState.subjectid = subject.subjectid || subjectKey;
+  progressState.subjectname = subject.subjectname || "";
+  progressState.taskid = "ALL";
+  progressState.taskname = "";
+
   document.getElementById("progress-tasks-title").innerText = subject.subjectname;
   showScreen("progress-tasks-screen");
   renderStudentSubjectTaskList();
@@ -375,72 +384,58 @@ function renderStudentSubjectTaskList() {
 
   const rows = [...subject.tasks].sort(sortByTaskId);
 
-  container.innerHTML = rows.map(task => {
-    const isComplete = isStatusOn(task.completestatus);
-    const isVerified = isStatusOn(task.verifystatus);
+  container.innerHTML = `
+    <div class="student-task-top-actions">
+      <button
+        class="small-btn save-top-btn"
+        onclick="saveProgressPendingChanges()"
+      >
+        Save Changes
+      </button>
+    </div>
 
-    return `
-      <div class="student-status-row">
-        <div class="student-status-name">${escapeHtml(task.taskname)}</div>
+    ${rows.map(task => {
+      const pending = progressPendingUpdates[task.studenttaskid] || {};
 
-        <div class="status-action" onclick="toggleStudentSubjectTask('${task.studenttaskid}', ${isComplete ? "false" : "true"},this)">
-          ${
-            isComplete
-              ? `<span class="status-tick status-tick-complete">✓</span>`
-              : `To be<br>completed`
-          }
+      const completeStatus = pending.completeStatus !== undefined
+        ? pending.completeStatus
+        : task.completestatus;
+
+      const verifyStatus = task.verifystatus;
+
+      const isComplete = isStatusOn(completeStatus);
+      const isVerified = isStatusOn(verifyStatus);
+
+      return `
+        <div class="student-status-row">
+          <div class="student-status-name">${escapeHtml(task.taskname)}</div>
+
+          <div
+            class="status-action"
+            onclick="toggleProgressPending('${task.studenttaskid}', 'completeStatus', ${isComplete ? "false" : "true"}, this)"
+          >
+            ${
+              isComplete
+                ? `<span class="status-tick status-tick-complete">✓</span>`
+                : `To be<br>completed`
+            }
+          </div>
+
+          <div class="status-action">
+            ${
+              isVerified
+                ? `<span class="status-tick status-tick-verified">✓</span>`
+                : `To be<br>verified`
+            }
+          </div>
         </div>
-
-        <div class="status-action">
-          ${
-            isVerified
-              ? `<span class="status-tick status-tick-verified">✓</span>`
-              : `To be<br>verified`
-          }
-        </div>
-      </div>
-    `;
-  }).join("");
+      `;
+    }).join("")}
+  `;
 }
 
-async function toggleStudentSubjectTask(studenttaskid, complete, element) {
-  const oldValue = !complete;
-
-  // Update the screen immediately.
-  updateProgressPendingElement(element, "completeStatus", complete);
-
-  // Update the local task data immediately.
-  Object.values(studentSubjectTaskGroups).forEach(subject => {
-    subject.tasks.forEach(task => {
-      if (String(task.studenttaskid) === String(studenttaskid)) {
-        task.completestatus = complete ? "YES" : "";
-      }
-    });
-  });
-
-  try {
-    const result = await apiPost("/api/tasks/update-complete", {
-      studenttaskid,
-      complete
-    }, state.token);
-
-    if (!result.success) {
-      throw new Error(result.error || "Could not update task.");
-    }
-  } catch (err) {
-    // Revert the screen if the save fails.
-    updateProgressPendingElement(element, "completeStatus", oldValue);
-
-    Object.values(studentSubjectTaskGroups).forEach(subject => {
-      subject.tasks.forEach(task => {
-        if (String(task.studenttaskid) === String(studenttaskid)) {
-          task.completestatus = oldValue ? "YES" : "";
-        }
-      });
-    });
-
-    alert(err.message || "Could not update task.");
-  }
+function toggleStudentSubjectTask(studenttaskid, complete, element) {
+  toggleProgressPending(studenttaskid, "completeStatus", complete, element);
 }
 
 
@@ -1208,40 +1203,83 @@ async function saveProgressPendingChanges() {
     return;
   }
 
-  for (const update of updates) {
-    if (update.completeStatus !== undefined) {
-      const completeResult = await apiPost("/api/tasks/update-complete", {
-        studenttaskid: update.studenttaskid,
-       complete: !!update.completeStatus
-      }, state.token);
+  const saveButton = document.querySelector(".save-btn, .save-top-btn, .save-progress-button");
+  const originalSaveText = saveButton ? saveButton.innerText : "";
 
-      if (!completeResult.success) {
-        alert(completeResult.error || "Could not save completion update.");
-        return;
-      }
-    }
-
-    if (update.verifyStatus !== undefined) {
-      const verifyResult = await apiPost("/api/admin/tasks/verify", {
-        studenttaskid: update.studenttaskid,
-        verified: !!update.verifyStatus
-      }, state.token);
-
-      if (!verifyResult.success) {
-        alert(verifyResult.error || "Could not save verification update.");
-        return;
-      }
-    }
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.innerText = "Saving...";
   }
 
-  alert("Changes saved.");
+  try {
+    for (const update of updates) {
+      if (update.completeStatus !== undefined) {
+        const completeResult = await apiPost("/api/tasks/update-complete", {
+          studenttaskid: update.studenttaskid,
+          complete: !!update.completeStatus
+        }, state.token);
 
-  progressPendingUpdates = {};
+        if (!completeResult.success) {
+          throw new Error(completeResult.error || "Could not save completion update.");
+        }
+      }
 
-  if (progressState.contextType === "student") {
-    await loadIndividualStudentTaskList();
-  } else {
-    await loadProgressTaskStudents();
+      if (update.verifyStatus !== undefined) {
+        const verifyResult = await apiPost("/api/admin/tasks/verify", {
+          studenttaskid: update.studenttaskid,
+          verified: !!update.verifyStatus
+        }, state.token);
+
+        if (!verifyResult.success) {
+          throw new Error(verifyResult.error || "Could not save verification update.");
+        }
+      }
+    }
+
+    if (progressState.contextType === "student-self") {
+      updates.forEach(update => {
+        Object.values(studentSubjectTaskGroups).forEach(subject => {
+          subject.tasks.forEach(task => {
+            if (String(task.studenttaskid) === String(update.studenttaskid)) {
+              if (update.completeStatus !== undefined) {
+                task.completestatus = update.completeStatus ? "YES" : "";
+              }
+            }
+          });
+        });
+      });
+
+      progressPendingUpdates = {};
+      renderStudentSubjectTaskList();
+
+      const refreshedButton = document.querySelector(".save-top-btn");
+      if (refreshedButton) {
+        refreshedButton.innerText = "Saved";
+        setTimeout(() => {
+          refreshedButton.innerText = "Save Changes";
+          refreshedButton.disabled = false;
+        }, 900);
+      }
+
+      return;
+    }
+
+    alert("Changes saved.");
+
+    progressPendingUpdates = {};
+
+    if (progressState.contextType === "student") {
+      await loadIndividualStudentTaskList();
+    } else {
+      await loadProgressTaskStudents();
+    }
+  } catch (err) {
+    alert(err.message || "Could not save changes.");
+
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.innerText = originalSaveText || "Save Changes";
+    }
   }
 }
 
