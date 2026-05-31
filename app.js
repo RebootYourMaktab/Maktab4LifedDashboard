@@ -446,28 +446,6 @@ async function toggleStudentSubjectTask(studenttaskid, complete, element) {
 
 
 
-async function toggleStudentSubjectTask(studenttaskid, complete) {
-  const result = await apiPost("/api/tasks/update-complete", {
-    studenttaskid,
-    complete
-  }, state.token);
-
-  if (!result.success) {
-    alert(result.error || "Could not update task.");
-    return;
-  }
-
-  Object.values(studentSubjectTaskGroups).forEach(subject => {
-    subject.tasks.forEach(task => {
-      if (String(task.studenttaskid) === String(studenttaskid)) {
-        task.completestatus = complete ? "YES" : "";
-      }
-    });
-  });
-
-  renderStudentSubjectTaskList();
-}
-
  async function toggleStudentTask(studenttaskid, complete) {
   const result = await apiPost("/api/tasks/update-complete", {
     studenttaskid,
