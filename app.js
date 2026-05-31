@@ -387,7 +387,7 @@ function renderStudentSubjectTaskList() {
           ${
             isComplete
               ? `<span class="status-tick status-tick-complete">✓</span>`
-              : `To be completed`
+              : `To be<br>completed`
           }
         </div>
 
@@ -395,7 +395,7 @@ function renderStudentSubjectTaskList() {
           ${
             isVerified
               ? `<span class="status-tick status-tick-verified">✓</span>`
-              : `To be verified`
+              : `To be<br>verified`
           }
         </div>
       </div>
@@ -1018,19 +1018,17 @@ function renderProgressTaskStudents(rows) {
         <div class="student-status-row">
           <div class="student-status-name">${escapeHtml(row.username)}</div>
 
-          <div class="status-action" onclick="toggleProgressPending('${row.studenttaskid}', 'completeStatus', ${isComplete ? "false" : "true"})">
-            ${
+<div class="status-action" onclick="toggleProgressPending('${row.studenttaskid}', 'completeStatus', ${isComplete ? "false" : "true"}, this)">            ${
               isComplete
                 ? `<span class="status-tick status-tick-complete">✓</span>`
-                : `To be completed`
+                : `To be<br>completed`
             }
           </div>
 
-          <div class="status-action" onclick="toggleProgressPending('${row.studenttaskid}', 'verifyStatus', ${isVerified ? "false" : "true"})">
-            ${
+<div class="status-action" onclick="toggleProgressPending('${row.studenttaskid}', 'verifyStatus', ${isVerified ? "false" : "true"}, this)">            ${
               isVerified
                 ? `<span class="status-tick status-tick-verified">✓</span>`
-                : `To be verified`
+                : `To be<br>verified`
             }
           </div>
         </div>
@@ -1118,7 +1116,7 @@ function renderIndividualStudentTaskList(rows) {
               ${
                 isComplete
                   ? `<span class="status-tick status-tick-complete">✓</span>`
-                  : `To be completed`
+                  : `To be<br>completed`
               }
             </div>
 
@@ -1126,7 +1124,7 @@ function renderIndividualStudentTaskList(rows) {
               ${
                 isVerified
                   ? `<span class="status-tick status-tick-verified">✓</span>`
-                  : `To be verified`
+                  : `To be<br>verified`
               }
             </div>
           </div>
@@ -1143,21 +1141,38 @@ function renderIndividualStudentTaskList(rows) {
   container.innerHTML = html;
 }
 
-function toggleProgressPending(studenttaskid, field, value) {
-  if (!progressPendingUpdates[studenttaskid]) {
-    progressPendingUpdates[studenttaskid] = {
-      studenttaskid
-    };
+function toggleProgressPending(studentTaskId, field, value, element) {
+  if (!progressPendingUpdates[studentTaskId]) {
+    progressPendingUpdates[studentTaskId] = {};
   }
 
-  progressPendingUpdates[studenttaskid][field] = value ? "YES" : "";
+  progressPendingUpdates[studentTaskId][field] = value;
 
-  if (progressState.contextType === "student") {
-    renderIndividualStudentTaskList(currentProgressRows);
-  } else {
-    renderProgressTaskStudents(currentProgressRows);
+  if (element) {
+    updateProgressPendingElement(element, field, value);
   }
 }
+function updateProgressPendingElement(element, field, value) {
+  if (field === "completeStatus") {
+    if (value) {
+      element.innerHTML = `<span class="status-tick status-tick-complete">✓</span>`;
+    } else {
+      element.innerHTML = `To be<br>completed`;
+    }
+  }
+
+  if (field === "verifyStatus") {
+    if (value) {
+      element.innerHTML = `<span class="status-tick status-tick-verified">✓</span>`;
+    } else {
+      element.innerHTML = `To be<br>verified`;
+    }
+  }
+}
+
+
+
+
 
 async function saveProgressPendingChanges() {
   const updates = Object.values(progressPendingUpdates);
