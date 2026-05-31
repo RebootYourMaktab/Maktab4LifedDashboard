@@ -525,16 +525,7 @@ button:active {
   margin: 15px 0 8px;
 }
 
-@media (max-width: 520px) {
-  .student-status-row {
-    grid-template-columns: 1fr;
-    text-align: center;
-  }
 
-  .student-status-name {
-    text-align: center;
-  }
-}
 
 .status-action {
   min-height: 34px;
@@ -671,12 +662,40 @@ button:active {
 
 @media (max-width: 520px) {
   .student-status-row {
-    grid-template-columns: 1fr;
-    text-align: center;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    align-items: center;
+    text-align: left;
+    padding: 10px;
   }
 
   .student-status-name {
+    flex: 1 0 110px;
+    min-width: 110px;
+    text-align: left;
+    font-size: 0.95rem;
+    line-height: 1.05;
+    overflow-wrap: anywhere;
+  }
+
+  .status-action {
+    flex: 0 0 76px;
+    min-width: 76px;
+    min-height: 44px;
+    font-size: 0.68rem;
+    line-height: 1.05;
+    white-space: normal;
     text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .status-tick {
+    font-size: 1.6rem;
   }
 }
 
