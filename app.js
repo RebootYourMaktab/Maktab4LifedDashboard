@@ -460,7 +460,7 @@ let studentResourceSubjects = [];
 let studentResourceGroupsByType = {};
 let currentStudentResourceMode = "";
 
-const PDFJS_VIEWER_PATH = "/pdfjs/web/viewer.html";
+const PDFJS_VIEWER_PATH = "/pdfjs-6/web/viewer.html";
 
 const STUDENT_RESOURCE_CATEGORIES = [
   {
