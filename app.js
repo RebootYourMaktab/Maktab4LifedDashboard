@@ -460,6 +460,8 @@ let studentResourceSubjects = [];
 let studentResourceGroupsByType = {};
 let currentStudentResourceMode = "";
 
+const PDFJS_VIEWER_PATH = "/pdfjs/web/viewer.html";
+
 const STUDENT_RESOURCE_CATEGORIES = [
   {
     key: "EBOOKS",
@@ -494,56 +496,59 @@ async function showStudentResources() {
   const container = document.getElementById("student-resource-subject-list");
   container.innerHTML = `<p class="helper-text">Loading resources...</p>`;
 
-  const result = await apiPost("/api/student/resources/list", {}, state.token);
+  try {
+    const result = await apiPost("/api/student/resources/list", {}, state.token);
 
-  if (!result.success) {
-    container.innerHTML = `<p class="error-message">${escapeHtml(result.error || "Failed to load resources")}</p>`;
-    return;
+    if (!result.success) {
+      container.innerHTML = `<p class="error-message">${escapeHtml(result.error || "Failed to load resources")}</p>`;
+      return;
+    }
+
+    // New backend response is grouped by media type: result.groups.
+    // Older response shape used result.subjects. Keep both supported for safety.
+    studentResourceSubjects = Array.isArray(result.subjects) ? result.subjects : [];
+    studentResourceGroupsByType = normalizeStudentResourceGroups(result);
+
+    renderStudentResourceCategories();
+  } catch (err) {
+    container.innerHTML = `<p class="error-message">Unable to load resources. Please try again.</p>`;
   }
-
-  // New backend response is grouped by media type: result.groups / result.pdf / result.audio / etc.
-  // Older response shape used result.subjects. Keep both supported.
-  studentResourceSubjects = Array.isArray(result.subjects) ? result.subjects : [];
-  studentResourceGroupsByType = normalizeStudentResourceGroups(result);
-
-  renderStudentResourceCategories();
 }
-
 
 function normalizeStudentResourceGroups(result) {
   const map = {};
 
-  function addGroup(group) {
+  function addGroup(group, fallbackType) {
     if (!group) return;
 
-    const type = String(group.type || group.key || "").trim().toUpperCase();
+    const type = String(group.type || group.key || fallbackType || "").trim().toUpperCase();
     if (!type) return;
+
+    const subjects = Array.isArray(group.subjects) ? group.subjects : [];
 
     map[type] = {
       type,
+      label: group.label || getCategoryLabel(type),
       count: Number(group.count || 0),
-      subjects: Array.isArray(group.subjects) ? group.subjects : []
+      subjects
     };
   }
 
   if (Array.isArray(result.groups)) {
-    result.groups.forEach(addGroup);
+    result.groups.forEach(group => addGroup(group));
   }
 
-  addGroup(result.ebooks);
-  addGroup(result.printables);
-  addGroup(result.audio);
-  addGroup(result.video);
-  addGroup(result.other);
+  addGroup(result.ebooks, "EBOOKS");
+  addGroup(result.printables, "PRINTABLES");
+  addGroup(result.audio, "AUDIO");
+  addGroup(result.video, "VIDEO");
+  addGroup(result.other, "OTHER");
 
   // Backward compatibility if an older backend still sends PDF instead of eBooks/Printables.
-  addGroup(result.pdf);
+  addGroup(result.pdf, "EBOOKS");
 
-  // Recalculate count from rows if the backend did not set count.
   Object.keys(map).forEach(type => {
-    const calculatedCount = map[type].subjects.reduce((sum, subject) => {
-      return sum + getDirectSubjectResources(subject).length;
-    }, 0);
+    const calculatedCount = countResourcesInSubjects(map[type].subjects);
 
     if (!map[type].count && calculatedCount) {
       map[type].count = calculatedCount;
@@ -551,6 +556,11 @@ function normalizeStudentResourceGroups(result) {
   });
 
   return map;
+}
+
+function getCategoryLabel(type) {
+  const category = STUDENT_RESOURCE_CATEGORIES.find(item => item.key === String(type || "").toUpperCase());
+  return category ? category.label : String(type || "Resources");
 }
 
 function getDirectMediaGroup(category) {
@@ -568,6 +578,48 @@ function getDirectSubjectResources(subject) {
   if (Array.isArray(subject.items)) return subject.items;
 
   return [];
+}
+
+function getSubjectModules(subject) {
+  if (!subject) return [];
+
+  if (Array.isArray(subject.modules)) return subject.modules;
+  if (Array.isArray(subject.Modules)) return subject.Modules;
+  if (Array.isArray(subject.moduleList)) return subject.moduleList;
+
+  const directResources = getDirectSubjectResources(subject);
+  if (directResources.length > 0) {
+    return [{
+      moduleid: subject.moduleid || "",
+      modulename: subject.modulename || "General",
+      resources: directResources
+    }];
+  }
+
+  return [];
+}
+
+function getModuleResources(module) {
+  if (!module) return [];
+
+  if (Array.isArray(module.resources)) return module.resources;
+  if (Array.isArray(module.Resources)) return module.Resources;
+  if (Array.isArray(module.resourceList)) return module.resourceList;
+  if (Array.isArray(module.items)) return module.items;
+
+  return [];
+}
+
+function countResourcesInSubjects(subjects) {
+  if (!Array.isArray(subjects)) return 0;
+
+  return subjects.reduce((subjectTotal, subject) => {
+    const moduleTotal = getSubjectModules(subject).reduce((sum, module) => {
+      return sum + getModuleResources(module).length;
+    }, 0);
+
+    return subjectTotal + moduleTotal;
+  }, 0);
 }
 
 function renderStudentResourceCategories() {
@@ -625,138 +677,127 @@ function renderStudentResourceCategoryDetail(category) {
   const container = document.getElementById("student-resource-detail-content");
   if (!container) return;
 
-  const groups = buildMediaResourceGroups(category);
+  const subjectGroups = buildMediaResourceGroups(category);
 
-  if (groups.length === 0) {
+  if (subjectGroups.length === 0) {
     container.innerHTML = `<p class="helper-text">No ${escapeHtml(category.label)} resources are available yet.</p>`;
     return;
   }
 
-  container.innerHTML = groups.map(group => `
+  container.innerHTML = subjectGroups.map(subjectGroup => `
     <div class="resource-section resource-subject-group">
-      <h3>${escapeHtml(group.subjectname || "Subject")}</h3>
-      <div class="resource-task-list">
-        ${group.rows.map(row => renderStudentResourceRow(row)).join("")}
-      </div>
+      <h3>${escapeHtml(subjectGroup.subjectname || "Subject")}</h3>
+      ${subjectGroup.modules.map(moduleGroup => `
+        <div class="resource-module-block">
+          <div class="resource-module-heading">${escapeHtml(moduleGroup.modulename || "General")}</div>
+          <div class="resource-task-list">
+            ${moduleGroup.rows.map(row => renderStudentResourceRow(row)).join("")}
+          </div>
+        </div>
+      `).join("")}
     </div>
   `).join("");
-}
-
-function buildSurahResourceGroups() {
-  const surahSubjectIds = new Set(["SUBJ1", "SUBJ2"]);
-  const groups = [];
-
-  getSortedResourceSubjects()
-    .filter(subject => surahSubjectIds.has(String(subject.subjectid || "").trim().toUpperCase()))
-    .forEach(subject => {
-      const rows = [];
-
-      getTaskGroups(subject).forEach(task => {
-        getTaskResourceArray(task).forEach(resource => {
-          rows.push({
-            subject,
-            task,
-            resource,
-            taskid: task.taskid,
-            taskname: task.taskname || resource.name || resource.taskresourcename || "Task Resource",
-            label: task.taskname || resource.name || resource.taskresourcename || "Task Resource",
-            sublabel: getResourceType(resource),
-            link: getResourceLink(resource),
-            type: getResourceType(resource),
-            source: "TASK"
-          });
-        });
-      });
-
-      rows.sort(resourceRowSorter);
-
-      if (rows.length > 0) {
-        groups.push({
-          subjectid: subject.subjectid,
-          subjectname: subject.subjectname,
-          rows
-        });
-      }
-    });
-
-  return groups;
 }
 
 function buildMediaResourceGroups(category) {
   const directGroup = getDirectMediaGroup(category);
 
   // Preferred new shape from Apps Script:
-  // { groups: [{ type: "AUDIO", subjects: [{ subjectname, resources: [...] }] }] }
+  // { groups: [{ type: "AUDIO", subjects: [{ subjectname, modules: [{ modulename, resources: [...] }] }] }] }
   if (directGroup) {
-    const groups = [];
+    const subjectGroups = [];
 
     (directGroup.subjects || []).forEach(subject => {
-      const rows = [];
-      const seenRows = new Set();
+      const moduleGroups = [];
 
-      getDirectSubjectResources(subject).forEach(resource => {
-        const type = getResourceType(resource);
-        const link = getResourceLink(resource);
-        const label = resource.label || resource.name || resource.resourcename || resource.taskresourcename || "Resource";
+      getSubjectModules(subject).forEach(module => {
+        const rows = [];
+        const seenRows = new Set();
 
-        addUniqueResourceRow(rows, seenRows, {
-          subject,
-          task: null,
-          resource,
-          taskid: resource.taskid || "",
-          taskname: label,
-          label,
-          sublabel: type,
-          link,
-          type,
-          source: resource.source || "RESOURCE"
+        getModuleResources(module).forEach(resource => {
+          const type = getResourceType(resource, category.key);
+          const link = getResourceLink(resource);
+          const format = getResourceFormat(resource, type);
+          const label = getResourceName(resource);
+
+          addUniqueResourceRow(rows, seenRows, {
+            subject,
+            module,
+            task: null,
+            resource,
+            taskid: resource.taskid || resource.taskId || "",
+            taskname: label,
+            label,
+            sublabel: format,
+            format,
+            link,
+            type,
+            source: resource.source || category.key || "RESOURCE"
+          });
+        });
+
+        rows.sort(resourceRowSorter);
+
+        if (rows.length > 0) {
+          moduleGroups.push({
+            moduleid: module.moduleid || module.ModuleId || module.ModuleID || "",
+            modulename: module.modulename || module.ModuleName || module.name || "General",
+            rows
+          });
+        }
+      });
+
+      moduleGroups.sort((a, b) => {
+        return String(a.modulename || "").localeCompare(String(b.modulename || ""), undefined, {
+          numeric: true,
+          sensitivity: "base"
         });
       });
 
-      rows.sort(resourceRowSorter);
-
-      if (rows.length > 0) {
-        groups.push({
-          subjectid: subject.subjectid,
-          subjectname: subject.subjectname || subject.name || "Subject",
-          rows
+      if (moduleGroups.length > 0) {
+        subjectGroups.push({
+          subjectid: subject.subjectid || subject.SubjectId || subject.SubjectID || "",
+          subjectname: subject.subjectname || subject.SubjectName || subject.name || "Subject",
+          modules: moduleGroups
         });
       }
     });
 
-    groups.sort((a, b) => {
+    subjectGroups.sort((a, b) => {
       return String(a.subjectname || "").localeCompare(String(b.subjectname || ""), undefined, {
         numeric: true,
         sensitivity: "base"
       });
     });
 
-    return groups;
+    return subjectGroups;
   }
 
   // Backward-compatible fallback for the older subject/task response shape.
-  const groups = [];
-  const allowedTypes = new Set((category.types || []).map(type => String(type).toUpperCase()));
+  const subjectGroups = [];
+  const allowedTypes = new Set((category.types || [category.key]).map(type => String(type).toUpperCase()));
 
   getSortedResourceSubjects().forEach(subject => {
     const rows = [];
     const seenRows = new Set();
 
     getSubjectResourceArray(subject).forEach(resource => {
-      const type = getResourceType(resource);
+      const type = getResourceType(resource, category.key);
 
-      if (!allowedTypes.has(type)) {
+      if (!allowedTypes.has(type) && !allowedTypes.has(category.key)) {
         return;
       }
 
       addUniqueResourceRow(rows, seenRows, {
         subject,
+        module: null,
         task: null,
         resource,
         taskid: "",
         taskname: "Subject Resource",
-        label: resource.name || resource.resourcename || "Subject Resource",
-        sublabel: type,
+        label: getResourceName(resource),
+        sublabel: getResourceFormat(resource, type),
+        format: getResourceFormat(resource, type),
         link: getResourceLink(resource),
         type,
         source: "SUBJECT"
@@ -765,20 +806,22 @@ function buildMediaResourceGroups(category) {
 
     getTaskGroups(subject).forEach(task => {
       getTaskResourceArray(task).forEach(resource => {
-        const type = getResourceType(resource);
+        const type = getResourceType(resource, category.key);
 
-        if (!allowedTypes.has(type)) {
+        if (!allowedTypes.has(type) && !allowedTypes.has(category.key)) {
           return;
         }
 
         addUniqueResourceRow(rows, seenRows, {
           subject,
+          module: null,
           task,
           resource,
           taskid: task.taskid,
-          taskname: task.taskname || resource.name || resource.taskresourcename || "Task Resource",
-          label: task.taskname || resource.name || resource.taskresourcename || "Task Resource",
-          sublabel: type,
+          taskname: task.taskname || getResourceName(resource),
+          label: task.taskname || getResourceName(resource),
+          sublabel: getResourceFormat(resource, type),
+          format: getResourceFormat(resource, type),
           link: getResourceLink(resource),
           type,
           source: "TASK"
@@ -789,15 +832,15 @@ function buildMediaResourceGroups(category) {
     rows.sort(resourceRowSorter);
 
     if (rows.length > 0) {
-      groups.push({
+      subjectGroups.push({
         subjectid: subject.subjectid,
         subjectname: subject.subjectname || "Subject",
-        rows
+        modules: [{ modulename: "General", rows }]
       });
     }
   });
 
-  return groups;
+  return subjectGroups;
 }
 
 function addUniqueResourceRow(rows, seenRows, row) {
@@ -812,13 +855,17 @@ function addUniqueResourceRow(rows, seenRows, row) {
 }
 
 function getResourceDedupeKey(row) {
-  const subjectId = String(row.subject && row.subject.subjectid || "").trim().toUpperCase();
+  const subjectId = String(row.subject && (row.subject.subjectid || row.subject.SubjectId || row.subject.SubjectID) || "").trim().toUpperCase();
+  const moduleId = String(row.module && (row.module.moduleid || row.module.ModuleId || row.module.ModuleID) || "").trim().toUpperCase();
   const taskId = String(row.taskid || "").trim().toUpperCase();
   const resource = row.resource || {};
   const resourceId = String(
     resource.id ||
     resource.resourceid ||
+    resource.resourceId ||
+    resource.ResourceId ||
     resource.taskresourceid ||
+    resource.taskResourceId ||
     ""
   ).trim().toUpperCase();
   const type = String(row.type || "").trim().toUpperCase();
@@ -827,10 +874,10 @@ function getResourceDedupeKey(row) {
   const source = String(row.source || "").trim().toUpperCase();
 
   if (resourceId) {
-    return [source, subjectId, taskId, resourceId].join("|");
+    return [source, subjectId, moduleId, taskId, resourceId].join("|");
   }
 
-  return [source, subjectId, taskId, type, link, label].join("|");
+  return [source, subjectId, moduleId, taskId, type, link, label].join("|");
 }
 
 function renderStudentResourceRow(row) {
@@ -840,21 +887,24 @@ function renderStudentResourceRow(row) {
   const disabled = link ? "" : " disabled";
   const buttonLabel = getSmallResourceButtonLabel(type);
   const rowId = makeResourceRowId(row);
+  const format = row.format || row.sublabel || getDisplayResourceType(type);
+  const isAudio = type === "AUDIO";
+  const isVideo = type === "VIDEO";
 
-  const actionHtml = type === "AUDIO"
+  const actionHtml = (isAudio || isVideo)
     ? `
-      <button class="resource-arrow-btn" onclick="toggleInlineAudioPlayer('${escapeForAttribute(rowId)}', '${escapeForAttribute(link)}')"${disabled} aria-label="${escapeForAttribute(buttonLabel)}">
+      <button class="resource-arrow-btn" onclick="toggleInlineResourcePreview('${escapeForAttribute(rowId)}', '${escapeForAttribute(link)}', '${escapeForAttribute(type)}')"${disabled} aria-label="${escapeForAttribute(buttonLabel)}">
         ›
       </button>
     `
     : `
-      <button class="resource-arrow-btn" onclick="openStudentResourceLink('${escapeForAttribute(link)}')"${disabled} aria-label="${escapeForAttribute(buttonLabel)}">
+      <button class="resource-arrow-btn" onclick="openStudentResourceLink('${escapeForAttribute(link)}', '${escapeForAttribute(type)}')"${disabled} aria-label="${escapeForAttribute(buttonLabel)}">
         ›
       </button>
     `;
 
-  const playerHtml = type === "AUDIO"
-    ? `<div id="${escapeForAttribute(rowId)}" class="inline-audio-player hidden"></div>`
+  const previewHtml = (isAudio || isVideo)
+    ? `<div id="${escapeForAttribute(rowId)}" class="inline-resource-preview hidden"></div>`
     : "";
 
   return `
@@ -863,8 +913,9 @@ function renderStudentResourceRow(row) {
         <div class="student-resource-title">${escapeHtml(title)}</div>
         <div class="student-resource-meta">
           <span class="resource-type-badge small-badge">${escapeHtml(getDisplayResourceType(type))}</span>
+          ${format ? `<span class="resource-format-text">${escapeHtml(format)}</span>` : ""}
         </div>
-        ${playerHtml}
+        ${previewHtml}
       </div>
       ${actionHtml}
     </div>
@@ -874,12 +925,13 @@ function renderStudentResourceRow(row) {
 function makeResourceRowId(row) {
   const raw = [
     row.source || "resource",
-    row.subject && row.subject.subjectname || "subject",
+    row.subject && (row.subject.subjectname || row.subject.SubjectName) || "subject",
+    row.module && (row.module.modulename || row.module.ModuleName) || "module",
     row.label || row.name || "item",
     row.link || "link"
   ].join("-");
 
-  return "audio-player-" + raw
+  return "resource-preview-" + raw
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -889,8 +941,8 @@ function makeResourceRowId(row) {
 function getDisplayResourceType(type) {
   const resourceType = String(type || "").toUpperCase();
 
-  if (resourceType === "EBOOKS") return "EBOOK";
-  if (resourceType === "PRINTABLES") return "PRINT";
+  if (resourceType === "EBOOKS" || resourceType === "EBOOK") return "EBOOK";
+  if (resourceType === "PRINTABLES" || resourceType === "PRINTABLE") return "PRINT";
   if (resourceType === "AUDIO") return "AUDIO";
   if (resourceType === "VIDEO") return "VIDEO";
   if (resourceType === "OTHER") return "OTHER";
@@ -898,21 +950,21 @@ function getDisplayResourceType(type) {
   return resourceType || "LINK";
 }
 
-function toggleInlineAudioPlayer(playerId, link) {
+function toggleInlineResourcePreview(playerId, link, type) {
   if (!link) {
     return;
   }
 
-  const playerBox = document.getElementById(playerId);
+  const previewBox = document.getElementById(playerId);
 
-  if (!playerBox) {
+  if (!previewBox) {
     return;
   }
 
-  const isHidden = playerBox.classList.contains("hidden");
+  const isHidden = previewBox.classList.contains("hidden");
 
   // Close other inline players so the screen stays tidy.
-  document.querySelectorAll(".inline-audio-player").forEach(player => {
+  document.querySelectorAll(".inline-resource-preview, .inline-audio-player").forEach(player => {
     if (player.id !== playerId) {
       player.classList.add("hidden");
       player.innerHTML = "";
@@ -920,34 +972,65 @@ function toggleInlineAudioPlayer(playerId, link) {
   });
 
   if (!isHidden) {
-    playerBox.classList.add("hidden");
-    playerBox.innerHTML = "";
+    previewBox.classList.add("hidden");
+    previewBox.innerHTML = "";
     return;
   }
 
-  playerBox.innerHTML = `
-    <audio class="resource-audio-control" controls controlsList="nodownload" preload="none">
-      <source src="${escapeForAttribute(link)}" />
-      Your browser cannot play this audio file.
-    </audio>
-  `;
+  const resourceType = String(type || "").toUpperCase();
 
-  playerBox.classList.remove("hidden");
+  if (resourceType === "VIDEO") {
+    previewBox.innerHTML = `
+      <video class="resource-video-control" controls controlsList="nodownload" preload="metadata">
+        <source src="${escapeForAttribute(link)}" />
+        Your browser cannot play this video file.
+      </video>
+    `;
+  } else {
+    previewBox.innerHTML = `
+      <audio class="resource-audio-control" controls controlsList="nodownload" preload="none">
+        <source src="${escapeForAttribute(link)}" />
+        Your browser cannot play this audio file.
+      </audio>
+    `;
+  }
+
+  previewBox.classList.remove("hidden");
 }
 
-function openStudentResourceLink(link) {
+function toggleInlineAudioPlayer(playerId, link) {
+  toggleInlineResourcePreview(playerId, link, "AUDIO");
+}
+
+function openStudentResourceLink(link, type) {
   if (!link) {
+    return;
+  }
+
+  const resourceType = String(type || "").toUpperCase();
+
+  if (resourceType === "EBOOKS" || resourceType === "EBOOK" || resourceType === "PRINTABLES" || resourceType === "PRINTABLE" || isPdfLink(link)) {
+    openPdfResource(link);
     return;
   }
 
   window.open(link, "_blank", "noopener,noreferrer");
 }
 
+function openPdfResource(link) {
+  const viewerUrl = `${PDFJS_VIEWER_PATH}?file=${encodeURIComponent(link)}`;
+  window.open(viewerUrl, "_blank", "noopener,noreferrer");
+}
+
+function isPdfLink(link) {
+  return /\.pdf($|[?#])/i.test(String(link || ""));
+}
+
 function getSmallResourceButtonLabel(type) {
   const resourceType = String(type || "").toUpperCase();
 
-  if (resourceType === "EBOOKS") return "Open eBook";
-  if (resourceType === "PRINTABLES") return "Open Printable";
+  if (resourceType === "EBOOKS" || resourceType === "EBOOK") return "Open eBook";
+  if (resourceType === "PRINTABLES" || resourceType === "PRINTABLE") return "Open Printable";
   if (resourceType === "PDF") return "Open PDF";
   if (resourceType === "AUDIO") return "Play Audio";
   if (resourceType === "VIDEO" || resourceType === "MOVIE") return "Watch Video";
@@ -1011,12 +1094,69 @@ function getTaskResourceArray(task) {
   return [];
 }
 
-function getResourceType(resource) {
-  return String(resource.type || resource.resourcetype || "LINK").trim().toUpperCase();
+function getResourceName(resource) {
+  if (!resource) return "Resource";
+
+  return String(
+    resource.name ||
+    resource.label ||
+    resource.resourcename ||
+    resource.resourceName ||
+    resource.ResourceName ||
+    resource.taskresourcename ||
+    resource.taskResourceName ||
+    "Resource"
+  ).trim();
+}
+
+function getResourceType(resource, fallbackType) {
+  return String(
+    resource && (resource.type || resource.resourcetype || resource.resourceType) ||
+    fallbackType ||
+    "LINK"
+  ).trim().toUpperCase();
+}
+
+function getResourceFormat(resource, fallbackType) {
+  if (!resource) return getDisplayResourceType(fallbackType);
+
+  return String(
+    resource.format ||
+    resource.resourceformat ||
+    resource.resourceFormat ||
+    resource.eBookFormat ||
+    resource.ebookformat ||
+    resource.PrintableFormat ||
+    resource.printableformat ||
+    resource.AudioFormat ||
+    resource.audioformat ||
+    resource.VideoFormat ||
+    resource.videoformat ||
+    resource.OtherResourceFormat ||
+    resource.otherresourceformat ||
+    getDisplayResourceType(fallbackType)
+  ).trim();
 }
 
 function getResourceLink(resource) {
-  return String(resource.link || resource.resourcelink || "").trim();
+  return String(
+    resource && (
+      resource.link ||
+      resource.resourcelink ||
+      resource.resourceLink ||
+      resource.eBookLink ||
+      resource.ebooklink ||
+      resource.PrintableLink ||
+      resource.printablelink ||
+      resource.AudioLink ||
+      resource.audiolink ||
+      resource.VideoLink ||
+      resource.videolink ||
+      resource.OtherResourceLink ||
+      resource.otherresourcelink
+    ) ||
+    ""
+  ).trim();
 }
 
 function countResourcesForCategory(category) {
@@ -1024,12 +1164,12 @@ function countResourcesForCategory(category) {
 
   const directGroup = getDirectMediaGroup(category);
   if (directGroup) {
-    return directGroup.subjects.reduce((sum, subject) => {
-      return sum + getDirectSubjectResources(subject).length;
-    }, 0);
+    return countResourcesInSubjects(directGroup.subjects);
   }
 
-  return buildMediaResourceGroups(category).reduce((sum, group) => sum + group.rows.length, 0);
+  return buildMediaResourceGroups(category).reduce((sum, group) => {
+    return sum + group.modules.reduce((moduleSum, module) => moduleSum + module.rows.length, 0);
+  }, 0);
 }
 
 function countResourcesForSubject(subject) {

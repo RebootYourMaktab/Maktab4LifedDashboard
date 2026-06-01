@@ -1246,3 +1246,39 @@ button:active {
 .student-resource-meta .resource-type-badge {
   margin-right: 0;
 }
+
+/* Student resource module grouping and inline previews */
+.resource-module-block {
+  margin-top: 12px;
+}
+
+.resource-module-heading {
+  background: rgba(35, 69, 105, 0.12);
+  color: var(--student-dark);
+  border-left: 5px solid var(--student-dark);
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.inline-resource-preview {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.resource-video-control {
+  width: 100%;
+  display: block;
+  margin-top: 8px;
+  border-radius: 10px;
+  background: #111;
+}
+
+.resource-format-text {
+  color: #555;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
