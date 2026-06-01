@@ -254,7 +254,8 @@ async function showStudentTasks() {
     return;
   }
 
-  studentSubjectTaskGroups = buildStudentSubjectTaskGroups(result.tasks);
+  const normalizedTasks = result.tasks.map(normalizeStudentTask);
+  studentSubjectTaskGroups = buildStudentSubjectTaskGroups(normalizedTasks);
   renderStudentSubjectProgress();
 }
 
@@ -305,6 +306,30 @@ function setProgressScreensForAdmin() {
     taskStudentsBackButton.classList.add("save-return-btn");
     taskStudentsBackButton.setAttribute("onclick", "saveProgressPendingChangesAndReturn()");
   }
+}
+
+function getStudentTaskField(task, names, fallback = "") {
+  for (const name of names) {
+    if (task && task[name] !== undefined && task[name] !== null && String(task[name]).trim() !== "") {
+      return task[name];
+    }
+  }
+  return fallback;
+}
+
+function normalizeStudentTask(task) {
+  return {
+    ...task,
+    studenttaskid: getStudentTaskField(task, ["studenttaskid", "studentTaskId", "StudentTaskID", "StudentTaskId"]),
+    taskid: getStudentTaskField(task, ["taskid", "taskID", "TaskID", "TaskId"]),
+    taskname: getStudentTaskField(task, ["taskname", "taskName", "TaskName", "Task"], "Untitled Task"),
+    subjectid: getStudentTaskField(task, ["subjectid", "subjectID", "SubjectID", "SubjectId"]),
+    subjectname: getStudentTaskField(task, ["subjectname", "subjectName", "SubjectName", "Subject"], "Other"),
+    moduleid: getStudentTaskField(task, ["moduleid", "moduleID", "ModuleID", "ModuleId"]),
+    modulename: getStudentTaskField(task, ["modulename", "moduleName", "ModuleName", "Module"]),
+    completestatus: getStudentTaskField(task, ["completestatus", "completeStatus", "CompleteStatus", "Complete", "Completed"]),
+    verifystatus: getStudentTaskField(task, ["verifystatus", "verifyStatus", "VerifyStatus", "Verified"])
+  };
 }
 
 function buildStudentSubjectTaskGroups(tasks) {
@@ -381,40 +406,77 @@ function renderStudentSubjectTaskList() {
     return;
   }
 
-  const rows = [...subject.tasks].sort(sortByTaskId);
+  const moduleGroups = buildStudentModuleTaskGroups(subject.tasks);
 
-  container.innerHTML = rows.map(task => {
-    const pending = progressPendingUpdates[task.studenttaskid] || {};
-
-    const completeStatus = pending.completeStatus !== undefined
-      ? pending.completeStatus
-      : task.completestatus;
-
-    const isComplete = isStatusOn(completeStatus);
-    const isVerified = isStatusOn(task.verifystatus);
+  container.innerHTML = moduleGroups.map(moduleGroup => {
+    const rowsHtml = moduleGroup.tasks.map(task => renderStudentTaskStatusRow(task)).join("");
 
     return `
-      <div class="student-status-row">
-        <div class="student-status-name">${escapeHtml(task.taskname)}</div>
-
-        <div class="status-action" onclick="toggleStudentSubjectTask('${task.studenttaskid}', ${isComplete ? "false" : "true"})">
-          ${
-            isComplete
-              ? `<span class="status-tick status-tick-complete">✓</span>`
-              : `To be<br>completed`
-          }
-        </div>
-
-        <div class="status-action">
-          ${
-            isVerified
-              ? `<span class="status-tick status-tick-verified">✓</span>`
-              : `To be<br>verified`
-          }
-        </div>
+      <div class="student-task-module-block">
+        <div class="task-resource-heading">${escapeHtml(moduleGroup.modulename)}</div>
+        ${rowsHtml}
       </div>
     `;
   }).join("");
+}
+
+function buildStudentModuleTaskGroups(tasks) {
+  const groups = {};
+
+  [...tasks].sort(sortByTaskId).forEach(task => {
+    const moduleName = task.modulename || "General";
+    const moduleKey = task.moduleid || moduleName;
+
+    if (!groups[moduleKey]) {
+      groups[moduleKey] = {
+        moduleid: task.moduleid || moduleKey,
+        modulename: moduleName,
+        tasks: []
+      };
+    }
+
+    groups[moduleKey].tasks.push(task);
+  });
+
+  return Object.values(groups).sort((a, b) => {
+    return String(a.modulename || "").localeCompare(String(b.modulename || ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  });
+}
+
+function renderStudentTaskStatusRow(task) {
+  const pending = progressPendingUpdates[task.studenttaskid] || {};
+
+  const completeStatus = pending.completeStatus !== undefined
+    ? pending.completeStatus
+    : task.completestatus;
+
+  const isComplete = isStatusOn(completeStatus);
+  const isVerified = isStatusOn(task.verifystatus);
+
+  return `
+    <div class="student-status-row">
+      <div class="student-status-name">${escapeHtml(task.taskname)}</div>
+
+      <div class="status-action" onclick="toggleStudentSubjectTask('${escapeForAttribute(task.studenttaskid)}', ${isComplete ? "false" : "true"})">
+        ${
+          isComplete
+            ? `<span class="status-tick status-tick-complete">✓</span>`
+            : `To be<br>completed`
+        }
+      </div>
+
+      <div class="status-action">
+        ${
+          isVerified
+            ? `<span class="status-tick status-tick-verified">✓</span>`
+            : `To be<br>verified`
+        }
+      </div>
+    </div>
+  `;
 }
 
 function toggleStudentSubjectTask(studenttaskid, complete) {
@@ -1018,6 +1080,8 @@ function openStudentResourceLink(link, type) {
 }
 
 function openPdfResource(link) {
+  // PDF.js v6 blocks cross-origin R2 files through ?file=.
+  // Open public R2 PDFs directly for now.
   window.open(link, "_blank", "noopener,noreferrer");
 }
 
