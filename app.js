@@ -1018,8 +1018,7 @@ function openStudentResourceLink(link, type) {
 }
 
 function openPdfResource(link) {
-  const viewerUrl = `${PDFJS_VIEWER_PATH}?file=${encodeURIComponent(link)}`;
-  window.open(viewerUrl, "_blank", "noopener,noreferrer");
+  window.open(link, "_blank", "noopener,noreferrer");
 }
 
 function isPdfLink(link) {
