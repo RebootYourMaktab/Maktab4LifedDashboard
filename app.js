@@ -335,7 +335,7 @@ function normalizeStudentTask(task) {
 function buildStudentSubjectTaskGroups(tasks) {
   const groups = {};
 
-  [...tasks].sort(sortByTaskId).forEach(task => {
+  [...tasks].sort(sortBySubjectIdThenTask).forEach(task => {
     const subjectName = task.subjectname || "Other";
     const subjectKey = task.subjectid || subjectName;
 
@@ -355,12 +355,7 @@ function buildStudentSubjectTaskGroups(tasks) {
 
 function renderStudentSubjectProgress() {
   const container = document.getElementById("progress-subjects-list");
-  const subjects = Object.values(studentSubjectTaskGroups).sort((a, b) => {
-    return String(a.subjectname || "").localeCompare(String(b.subjectname || ""), undefined, {
-      numeric: true,
-      sensitivity: "base"
-    });
-  });
+  const subjects = Object.values(studentSubjectTaskGroups).sort(sortSubjectGroupsBySubjectId);
 
   if (subjects.length === 0) {
     container.innerHTML = `<p class="helper-text">No tasks assigned yet.</p>`;
@@ -423,7 +418,7 @@ function renderStudentSubjectTaskList() {
 function buildStudentModuleTaskGroups(tasks) {
   const groups = {};
 
-  [...tasks].sort(sortByTaskId).forEach(task => {
+  [...tasks].sort(sortByModuleThenTask).forEach(task => {
     const moduleName = task.modulename || "General";
     const moduleKey = task.moduleid || moduleName;
 
@@ -438,12 +433,7 @@ function buildStudentModuleTaskGroups(tasks) {
     groups[moduleKey].tasks.push(task);
   });
 
-  return Object.values(groups).sort((a, b) => {
-    return String(a.modulename || "").localeCompare(String(b.modulename || ""), undefined, {
-      numeric: true,
-      sensitivity: "base"
-    });
-  });
+  return Object.values(groups).sort(sortModuleGroupsByModuleId);
 }
 
 function renderStudentTaskStatusRow(task) {
@@ -2124,27 +2114,53 @@ function groupTasksBySubject(tasks) {
   return grouped;
 }
 
-function sortByTaskId(a, b) {
-  const aRaw = a.taskid || a.taskID || a.TaskID || "";
-  const bRaw = b.taskid || b.taskID || b.TaskID || "";
-  const aNum = Number(aRaw);
-  const bNum = Number(bRaw);
-
-  if (!Number.isNaN(aNum) && !Number.isNaN(bNum) && aNum !== bNum) {
-    return aNum - bNum;
-  }
-
-  const idCompare = String(aRaw).localeCompare(String(bRaw), undefined, {
+function naturalCompare(a, b) {
+  return String(a || "").localeCompare(String(b || ""), undefined, {
     numeric: true,
     sensitivity: "base"
   });
+}
 
+function getTaskSubjectId(task) {
+  return task.subjectid || task.subjectID || task.SubjectID || task.SubjectId || "";
+}
+
+function getTaskModuleId(task) {
+  return task.moduleid || task.moduleID || task.ModuleID || task.ModuleId || "";
+}
+
+function sortSubjectGroupsBySubjectId(a, b) {
+  const subjectCompare = naturalCompare(a.subjectid || a.subjectname, b.subjectid || b.subjectname);
+  if (subjectCompare !== 0) return subjectCompare;
+  return naturalCompare(a.subjectname, b.subjectname);
+}
+
+function sortModuleGroupsByModuleId(a, b) {
+  const moduleCompare = naturalCompare(a.moduleid || a.modulename, b.moduleid || b.modulename);
+  if (moduleCompare !== 0) return moduleCompare;
+  return naturalCompare(a.modulename, b.modulename);
+}
+
+function sortBySubjectIdThenTask(a, b) {
+  const subjectCompare = naturalCompare(getTaskSubjectId(a), getTaskSubjectId(b));
+  if (subjectCompare !== 0) return subjectCompare;
+  return sortByTaskId(a, b);
+}
+
+function sortByModuleThenTask(a, b) {
+  const moduleCompare = naturalCompare(getTaskModuleId(a), getTaskModuleId(b));
+  if (moduleCompare !== 0) return moduleCompare;
+  return sortByTaskId(a, b);
+}
+
+function sortByTaskId(a, b) {
+  const aRaw = a.taskid || a.taskID || a.TaskID || a.TaskId || "";
+  const bRaw = b.taskid || b.taskID || b.TaskID || b.TaskId || "";
+
+  const idCompare = naturalCompare(aRaw, bRaw);
   if (idCompare !== 0) return idCompare;
 
-  return String(a.taskname || "").localeCompare(String(b.taskname || ""), undefined, {
-    numeric: true,
-    sensitivity: "base"
-  });
+  return naturalCompare(a.taskname || a.TaskName || "", b.taskname || b.TaskName || "");
 }
 
 function isStatusOn(value) {

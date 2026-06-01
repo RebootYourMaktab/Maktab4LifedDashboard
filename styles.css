@@ -1282,3 +1282,50 @@ button:active {
   font-size: 0.82rem;
   overflow-wrap: anywhere;
 }
+
+
+/* Temporary student landing page: two large square buttons */
+.student-main-button-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.student-main-button {
+  aspect-ratio: 1 / 1;
+  min-height: 150px;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  font-size: 1.25rem;
+}
+
+.student-main-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  width: 54px;
+  height: 54px;
+  color: white;
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  font-size: 1.5rem;
+}
+
+@media (max-width: 420px) {
+  .student-main-button-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .student-main-button {
+    aspect-ratio: auto;
+    min-height: 130px;
+  }
+}
