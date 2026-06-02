@@ -2591,12 +2591,12 @@ async function renderViewAttendanceScreen(startDate, endDate) {
     </div>
 
     <div class="attendance-filter-box">
-      <div class="attendance-date-row">
+      <div class="attendance-date-row attendance-date-row-compact">
         <input type="date" id="view-start-date" value="${escapeHtml(startDate)}">
         <span class="attendance-date-label">START DATE</span>
       </div>
 
-      <div class="attendance-date-row">
+      <div class="attendance-date-row attendance-date-row-compact">
         <input type="date" id="view-end-date" value="${escapeHtml(endDate)}">
         <span class="attendance-date-label">END DATE</span>
       </div>
@@ -2672,12 +2672,12 @@ async function renderAttendanceStatsScreen(startDate, endDate) {
     </div>
 
     <div class="attendance-filter-box">
-      <div class="attendance-date-row">
+      <div class="attendance-date-row attendance-date-row-compact">
         <input type="date" id="stats-start-date" value="${escapeHtml(startDate)}">
         <span class="attendance-date-label">START DATE</span>
       </div>
 
-      <div class="attendance-date-row">
+      <div class="attendance-date-row attendance-date-row-compact">
         <input type="date" id="stats-end-date" value="${escapeHtml(endDate)}">
         <span class="attendance-date-label">END DATE</span>
       </div>

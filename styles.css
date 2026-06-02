@@ -1572,7 +1572,23 @@ button:active {
 }
 
 
-/* Cosmetic updates: Staff dashboard */
+
+/* =========================
+   Final mobile cosmetic updates
+========================= */
+
+/* Staff Dashboard: four ordered cards with alternating teal shades */
+.staff-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.staff-dashboard-grid .home-card {
+  min-height: 82px;
+  justify-content: flex-start;
+}
+
 .staff-dashboard-grid .home-card:nth-child(odd) {
   background: var(--teal-dark);
 }
@@ -1581,55 +1597,114 @@ button:active {
   background: #66b3b3;
 }
 
-/* Cosmetic updates: Attendance module */
+/* Student home title */
+#student-home-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+#student-welcome {
+  margin: 0;
+}
+
+/* Attendance: compact, mobile-safe date rows */
 .attendance-date-row {
   width: 100%;
   max-width: 100%;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  align-items: center;
   gap: 10px;
-  margin: 6px 0 10px;
+  margin: 4px 0 8px;
 }
 
 .attendance-date-row input[type="date"] {
-  width: 100%;
-  max-width: 100%;
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
+  width: auto;
   margin: 0;
-  padding: 12px 10px;
-  overflow: hidden;
+  padding: 11px 9px;
+  text-align: center;
+  font-family: Arial, sans-serif;
 }
 
 .attendance-date-row-compact {
-  margin: 2px 0 4px;
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+
+.attendance-date-label {
+  flex: 0 0 auto;
+  color: var(--teal-dark);
+  font-family: 'Gagalin', Arial, sans-serif;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  font-size: 0.92rem;
 }
 
 .attendance-filter-box {
-  padding: 12px;
-  margin-bottom: 14px;
+  padding: 10px;
+  margin-bottom: 10px;
 }
 
 .attendance-filter-box .attendance-date-row {
-  margin: 2px 0 6px;
+  margin: 0 0 5px;
 }
 
 .attendance-filter-box button {
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
+/* Mark Register feedback and top save */
 .attendance-absence-feedback {
-  margin: 2px 0 12px;
+  margin: 0 0 8px;
   color: var(--teal-dark);
   font-weight: bold;
   text-align: left;
+  font-size: 0.95rem;
+}
+
+#attendance-register-screen .nav-header {
+  margin-bottom: 8px;
+}
+
+#attendance-register-screen .attendance-save-btn {
+  margin-top: 0;
+}
+
+/* Replace attendance group labels with thin teal separators */
+.attendance-group-heading {
+  display: none;
 }
 
 .attendance-group-line {
   height: 2px;
   background: var(--teal-dark);
   border-radius: 999px;
-  margin: 12px 0 8px;
+  margin: 10px 0 6px;
 }
 
+/* Tighter attendance rows */
+.attendance-register-row {
+  padding: 9px 0;
+  gap: 9px;
+}
+
+.attendance-report-row {
+  margin-top: 2px;
+  padding: 9px 8px;
+}
+
+.attendance-report-header {
+  padding: 8px;
+}
+
+.attendance-absent-dates {
+  padding: 8px;
+}
+
+/* Stats: label and percentage as two aligned columns */
+.attendance-breakdown-label,
 .attendance-breakdown-label-grid {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -1640,23 +1715,50 @@ button:active {
 @media (max-width: 520px) {
   .attendance-date-row,
   .attendance-filter-box .attendance-date-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
-    margin: 0 0 6px;
-  }
-
-  .attendance-date-label {
-    text-align: right;
-    padding-right: 2px;
-    font-size: 0.9rem;
+    flex-wrap: nowrap;
+    gap: 6px;
   }
 
   .attendance-date-row input[type="date"] {
-    font-size: 1rem;
-    padding: 11px 8px;
+    font-size: 0.95rem;
+    padding: 10px 7px;
   }
 
-  .attendance-filter-box {
-    padding: 10px;
+  .attendance-date-label {
+    font-size: 0.78rem;
+  }
+
+  .attendance-register-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+
+  .attendance-student-name {
+    min-width: 0;
+    flex: 1 1 auto;
+    font-size: 0.98rem;
+  }
+
+  .attendance-toggle {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 112px;
+    padding: 8px 9px;
+    font-size: 0.78rem;
+  }
+
+  .attendance-report-header,
+  .attendance-report-row {
+    grid-template-columns: minmax(0, 1fr) 68px 54px;
+    gap: 5px;
+    font-size: 0.82rem;
+  }
+
+  .save-return-btn.attendance-save-btn {
+    min-width: 134px;
+    font-size: 0.74rem;
   }
 }

@@ -87,37 +87,33 @@
         <button class="small-btn" onclick="logout()">Logout</button>
       </div>
 
-      <div class="card-grid">
-       <button class="home-card" onclick="showAdminAcademics()">
-          <span class="card-icon">▧</span>
-          <span>Progress Monitor</span>
-        </button>
-     
-      <button class="home-card" onclick="showAdminAcademics()">
-          <span class="card-icon">▧</span>
-          <span>Academics</span>
-        </button>
-      
-
-      
-     
-        <button class="home-card" onclick="showPlaceholder('Student Records')">
-          <span class="card-icon">▦</span>
-          <span>Student Records</span>
-        </button>
-
+      <div class="card-grid staff-dashboard-grid">
         <button class="home-card" onclick="showAttendanceDashboard()">
           <span class="card-icon">✓</span>
           <span>Attendance</span>
         </button>
- </div>
-       
+
+        <button class="home-card" onclick="showAdminResources()">
+          <span class="card-icon">▤</span>
+          <span>Learning Resources</span>
+        </button>
+
+        <button class="home-card" onclick="showProgressReport()">
+          <span class="card-icon">▧</span>
+          <span>Progress Monitor</span>
+        </button>
+
+        <button class="home-card" onclick="showAdminAcademics()">
+          <span class="card-icon">▦</span>
+          <span>Admin</span>
+        </button>
+      </div>
     </section>
 
     <!-- ADMIN ACADEMICS MENU -->
     <section id="admin-academics" class="screen admin-theme">
       <div class="nav-header">
-        <h2>Academics</h2>
+        <h2>Admin</h2>
         <button class="small-btn" onclick="showScreen('admin-home')">Back</button>
       </div>
 
@@ -238,7 +234,7 @@
     <section id="subjects-screen" class="screen admin-theme">
          <div class="nav-header">
             <h2>Subjects</h2>
-    <button class="small-btn" onclick="showScreen('admin-academics')">Back</button>
+    <button class="small-btn" onclick="showScreen('admin-home')">Back</button>
   </div>
 
   <div class="dashboard-section subject-panel">
