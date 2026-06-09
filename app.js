@@ -90,7 +90,7 @@ async function checkStudent() {
 
     state.user = result.student;
 
-    document.getElementById("portal-title").innerText = "Student Portal";
+    document.getElementById("portal-title").innerText = "Student Login";
     document.getElementById("portal-subtitle").innerText =
       `Welcome ${result.student.username}`;
 
@@ -117,7 +117,7 @@ async function checkAdmin() {
 
     state.user = result.admin;
 
-    document.getElementById("portal-title").innerText = "Staff Portal";
+    document.getElementById("portal-title").innerText = "Admin Login";
     document.getElementById("portal-subtitle").innerText =
       `${result.admin.username} · ${result.admin.role}`;
 
