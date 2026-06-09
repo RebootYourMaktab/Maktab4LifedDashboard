@@ -34,9 +34,9 @@ function initApp() {
     return;
   }
 
-  document.getElementById("portal-title").innerText = "UmmAbbad Academy";
+  document.getElementById("portal-title").innerText = "Maktab4Life";
   document.getElementById("portal-subtitle").innerText =
-    "Please open your personal login link.";
+    "You require a personal URL to access the Maktab4Life Daashboard";
 }
 
 function showScreen(id) {
